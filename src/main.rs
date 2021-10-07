@@ -48,12 +48,12 @@ impl Filter {
     where
         F: FnMut(&[u8]),
     {
-        fn skip_38_48<'a>(mut iter: impl Iterator<Item = &'a [u8]>) {
+        fn skip_38_48<'a>(mut iter: impl Iterator<Item = Option<u8>>) {
             match iter.next() {
-                Some(b"5") => {
+                Some(Some(5)) => {
                     iter.next();
                 }
-                Some(b"2") => {
+                Some(Some(2)) => {
                     iter.next(); // r
                     iter.next(); // g
                     iter.next(); // b
@@ -64,46 +64,48 @@ impl Filter {
 
         write(b"\x1b[");
         let reversed = self.parent_video_reversed();
-        let mut iter = data.split(|b| *b == b';');
         let mut any_written = false;
+        let mut iter = data.split(|b| *b == b';').map(|arg| {
+            (
+                arg,
+                match arg {
+                    [] => Some(0),
+                    _ => std::str::from_utf8(arg).unwrap().parse::<u8>().ok(),
+                },
+            )
+        });
 
-        while let Some(arg) = iter.next() {
-            match arg {
-                b"0" | [] => {
+        while let Some((arg, n)) = iter.next() {
+            match n {
+                Some(0) => {
                     self.background_set = false;
                     self.video_reversed = false;
                 }
 
-                b"1" => {}
-                b"2" => {}
-                [b'3', b'0'..=b'7'] => {}
-                b"38" => skip_38_48(&mut iter),
-                b"39" => {}
-                b"58" => {}
-                b"59" => {}
-                [b'9', b'0'..=b'7'] => {}
+                Some(1 | 2 | 30..=37 | 39 | 58 | 59 | 90..=97) => {}
+                Some(38) => skip_38_48(iter.by_ref().map(|(_, n)| n)),
 
-                b"7" => {
+                Some(7) => {
                     self.video_reversed = true;
                 }
-                b"27" => {
+                Some(27) => {
                     self.video_reversed = false;
                 }
 
-                [b'4', b'0'..=b'7'] => {
+                Some(40..=47) => {
                     self.background_set = true;
                 }
-                b"48" => {
-                    skip_38_48(&mut iter);
+                Some(48) => {
+                    skip_38_48(iter.by_ref().map(|(_, n)| n));
                     self.background_set = true;
                 }
-                b"49" => {
+                Some(49) => {
                     self.background_set = false;
                 }
-                [b'1', b'0', b'0'..=b'7'] => {
+                Some(100..=107) => {
                     self.background_set = true;
                 }
-                arg => {
+                _ => {
                     if mem::replace(&mut any_written, true) {
                         write(b";");
                     }
