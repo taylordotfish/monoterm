@@ -25,7 +25,9 @@ use std::mem;
 use std::process::exit;
 
 const USAGE: &str = "\
-Usage: monoterm [options] <command> [args...]
+Usage:
+  monoterm <command> [args...]
+  monoterm [options]
 
 Executes <command> while converting all terminal colors to monochrome.
 
@@ -103,11 +105,19 @@ impl Filter {
             )
         });
 
+        let mut write_arg = |arg: &[u8]| {
+            if mem::replace(&mut any_written, true) {
+                write(b";");
+            }
+            write(arg);
+        };
+
         while let Some((arg, n)) = iter.next() {
             match n {
                 Some(0) => {
                     self.background_set = false;
                     self.video_reversed = false;
+                    write_arg(b"0");
                 }
 
                 Some(1 | 2 | 30..=37 | 39 | 58 | 59 | 90..=97) => {}
@@ -134,10 +144,7 @@ impl Filter {
                     self.background_set = true;
                 }
                 _ => {
-                    if mem::replace(&mut any_written, true) {
-                        write(b";");
-                    }
-                    write(arg);
+                    write_arg(arg);
                 }
             }
         }
