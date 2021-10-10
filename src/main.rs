@@ -93,7 +93,7 @@ impl Filter {
         }
 
         write(b"\x1b[");
-        let reversed = self.parent_video_reversed();
+        let mut reversed = self.parent_video_reversed();
         let mut any_written = false;
         let mut iter = data.split(|b| *b == b';').map(|arg| {
             (
@@ -117,6 +117,7 @@ impl Filter {
                 Some(0) => {
                     self.background_set = false;
                     self.video_reversed = false;
+                    reversed = false;
                     write_arg(b"0");
                 }
 
