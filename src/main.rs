@@ -20,8 +20,19 @@
 use filterm::FilterHooks;
 use std::cell::Cell;
 use std::env;
+use std::ffi::OsString;
 use std::mem;
 use std::process::exit;
+
+const USAGE: &str = "\
+Usage: monoterm [options] <command> [args...]
+
+Executes <command> while converting all terminal colors to monochrome.
+
+Options:
+  -h --help     Show this help message
+  -v --version  Show program version
+";
 
 thread_local! {
     static BUFFER: Cell<Option<Vec<u8>>> = Cell::new(None);
@@ -65,7 +76,7 @@ impl Filter {
     where
         F: FnMut(&[u8]),
     {
-        fn skip_38_48<'a>(mut iter: impl Iterator<Item = Option<u8>>) {
+        fn skip_38_48(mut iter: impl Iterator<Item = Option<u8>>) {
             match iter.next() {
                 Some(Some(5)) => {
                     iter.next();
@@ -199,21 +210,69 @@ impl FilterHooks for Filter {
     }
 }
 
-fn main() {
-    let args: Vec<_> = env::args_os().skip(1).collect();
-    if args.is_empty() {
-        eprintln!(
-            "usage: {} <command> [args...]",
-            env::current_exe()
-                .ok()
-                .as_ref()
-                .and_then(|p| p.file_name())
-                .and_then(|s| s.to_str())
-                .unwrap_or("monoterm"),
-        );
+fn show_usage() -> ! {
+    print!("{}", USAGE);
+    exit(0);
+}
+
+fn show_version() -> ! {
+    println!("{}", env!("CARGO_PKG_VERSION"));
+    exit(0);
+}
+
+macro_rules! args_error {
+    ($($args:tt)*) => {
+        eprintln!("error: {}", format_args!($($args)*));
+        eprintln!("See monoterm --help for usage information.");
+        exit(1);
+    };
+}
+
+fn parse_args<Args>(args: Args) -> Vec<OsString>
+where
+    Args: IntoIterator<Item = OsString>,
+{
+    let mut options_done = false;
+    let mut process_arg = |arg: &str| match arg {
+        _ if options_done => true,
+        "--" => {
+            options_done = true;
+            false
+        }
+        "--help" => show_usage(),
+        "--version" => show_version(),
+        s if s.starts_with("--") => {
+            args_error!("unrecognized option: {}", s);
+        }
+        s if s.starts_with('-') => {
+            s.chars().skip(1).for_each(|c| match c {
+                'h' => show_usage(),
+                'v' => show_version(),
+                c => {
+                    args_error!("unrecognized option: -{}", c);
+                }
+            });
+            true
+        }
+        _ => {
+            options_done = true;
+            true
+        }
+    };
+
+    let command: Vec<_> = args
+        .into_iter()
+        .filter(|a| process_arg(&a.to_string_lossy()))
+        .collect();
+    if command.is_empty() {
+        eprint!("{}", USAGE);
         exit(1);
     }
+    command
+}
 
+fn main() {
+    let args = parse_args(env::args_os().skip(1));
     let mut filter = Filter::new();
     match filterm::run(args, &mut filter) {
         Ok(_) => {}
