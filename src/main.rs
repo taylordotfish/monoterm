@@ -1,3 +1,22 @@
+/*
+ * Copyright (C) 2021 taylor.fish <contact@taylor.fish>
+ *
+ * This file is part of Monoterm.
+ *
+ * Monoterm is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Monoterm is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Monoterm. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 use filterm::FilterHooks;
 use std::cell::Cell;
 use std::env;
@@ -14,9 +33,7 @@ fn get_buffer() -> Vec<u8> {
 
 fn set_buffer(mut buffer: Vec<u8>) {
     buffer.clear();
-    BUFFER.with(|buf| {
-        buf.set(Some(buffer));
-    });
+    BUFFER.with(|buf| buf.set(Some(buffer)));
 }
 
 enum State {
@@ -198,5 +215,11 @@ fn main() {
     }
 
     let mut filter = Filter::new();
-    filterm::run(args, &mut filter);
+    match filterm::run(args, &mut filter) {
+        Ok(_) => {}
+        Err(e) => {
+            eprintln!("error: {}", e);
+            exit(1);
+        }
+    }
 }
