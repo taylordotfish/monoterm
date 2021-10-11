@@ -25,13 +25,12 @@ use std::mem;
 use std::process::exit;
 
 const USAGE: &str = "\
-Usage:
-  monoterm <command> [args...]
-  monoterm [options]
+Usage: monoterm [options] <command> [args...]
 
 Executes <command> while converting all terminal colors to monochrome.
 
 Options:
+  -b --bold     Convert foreground colors to bold text
   -h --help     Show this help message
   -v --version  Show program version
 ";
@@ -56,22 +55,32 @@ enum State {
 }
 
 struct Filter {
+    use_bold: bool,
     state: State,
     background_set: bool,
     video_reversed: bool,
+    foreground_set: bool,
+    intensity_set: bool,
 }
 
 impl Filter {
-    pub fn new() -> Self {
+    pub fn new(bold: bool) -> Self {
         Self {
+            use_bold: bold,
             state: State::Init,
             background_set: false,
             video_reversed: false,
+            foreground_set: false,
+            intensity_set: false,
         }
     }
 
     fn parent_video_reversed(&self) -> bool {
         self.background_set != self.video_reversed
+    }
+
+    fn bold(&self) -> bool {
+        self.use_bold && (self.intensity_set || self.foreground_set)
     }
 
     fn handle_sgr<F>(&mut self, data: &[u8], mut write: F)
@@ -92,9 +101,6 @@ impl Filter {
             }
         }
 
-        write(b"\x1b[");
-        let mut reversed = self.parent_video_reversed();
-        let mut any_written = false;
         let mut iter = data.split(|b| *b == b';').map(|arg| {
             (
                 arg,
@@ -105,32 +111,52 @@ impl Filter {
             )
         });
 
+        let mut any_written = false;
         let mut write_arg = |arg: &[u8]| {
             if mem::replace(&mut any_written, true) {
                 write(b";");
+            } else {
+                write(b"\x1b[");
             }
             write(arg);
         };
 
+        let mut reversed = self.parent_video_reversed();
+        let mut bold = self.bold();
         while let Some((arg, n)) = iter.next() {
             match n {
                 Some(0) => {
                     self.background_set = false;
                     self.video_reversed = false;
+                    self.foreground_set = false;
+                    self.intensity_set = false;
                     reversed = false;
+                    bold = false;
                     write_arg(b"0");
                 }
-
-                Some(1 | 2 | 30..=37 | 39 | 58 | 59 | 90..=97) => {}
-                Some(38) => skip_38_48(iter.by_ref().map(|(_, n)| n)),
-
+                Some(1 | 2) => {
+                    self.intensity_set = true;
+                }
+                Some(22) => {
+                    self.intensity_set = false;
+                }
+                Some(30..=37 | 90..=97) => {
+                    self.foreground_set = true;
+                }
+                Some(38) => {
+                    skip_38_48(iter.by_ref().map(|(_, n)| n));
+                    self.foreground_set = true;
+                }
+                Some(39) => {
+                    self.foreground_set = false;
+                }
+                Some(58 | 59) => {}
                 Some(7) => {
                     self.video_reversed = true;
                 }
                 Some(27) => {
                     self.video_reversed = false;
                 }
-
                 Some(40..=47) => {
                     self.background_set = true;
                 }
@@ -151,17 +177,26 @@ impl Filter {
         }
 
         let new_reversed = self.parent_video_reversed();
-        if new_reversed != reversed || !any_written {
-            if any_written {
-                write(b";");
-            }
-            write(if new_reversed {
+        if new_reversed != reversed {
+            write_arg(if new_reversed {
                 b"7"
             } else {
                 b"27"
             });
         }
-        write(b"m");
+
+        let new_bold = self.bold();
+        if new_bold != bold {
+            write_arg(if new_bold {
+                b"1"
+            } else {
+                b"22"
+            });
+        }
+
+        if any_written {
+            write(b"m");
+        }
     }
 
     fn handle_byte<F>(&mut self, b: u8, mut write: F)
@@ -236,10 +271,16 @@ macro_rules! args_error {
     };
 }
 
-fn parse_args<Args>(args: Args) -> Vec<OsString>
+struct ParsedArgs {
+    pub command: Vec<OsString>,
+    pub bold: bool,
+}
+
+fn parse_args<Args>(args: Args) -> ParsedArgs
 where
     Args: IntoIterator<Item = OsString>,
 {
+    let mut bold = false;
     let mut options_done = false;
     let mut process_arg = |arg: &str| match arg {
         _ if options_done => true,
@@ -249,18 +290,25 @@ where
         }
         "--help" => show_usage(),
         "--version" => show_version(),
+        "--bold" => {
+            bold = true;
+            false
+        }
         s if s.starts_with("--") => {
             args_error!("unrecognized option: {}", s);
         }
         s if s.starts_with('-') => {
-            s.chars().skip(1).for_each(|c| match c {
+            let iter = s.chars().skip(1).map(|c| match c {
                 'h' => show_usage(),
                 'v' => show_version(),
+                'b' => {
+                    bold = true;
+                }
                 c => {
                     args_error!("unrecognized option: -{}", c);
                 }
             });
-            true
+            iter.fold(true, |_, _| false)
         }
         _ => {
             options_done = true;
@@ -276,13 +324,16 @@ where
         eprint!("{}", USAGE);
         exit(1);
     }
-    command
+    ParsedArgs {
+        command,
+        bold,
+    }
 }
 
 fn main() {
     let args = parse_args(env::args_os().skip(1));
-    let mut filter = Filter::new();
-    match filterm::run(args, &mut filter) {
+    let mut filter = Filter::new(args.bold);
+    match filterm::run(args.command, &mut filter) {
         Ok(_) => {}
         Err(e) => {
             eprintln!("error: {}", e);
