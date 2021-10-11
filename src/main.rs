@@ -54,24 +54,31 @@ enum State {
     AfterCsi(Vec<u8>),
 }
 
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum Intensity {
+    High,
+    Low,
+    Normal,
+}
+
 struct Filter {
-    use_bold: bool,
+    bold_colors: bool,
     state: State,
     background_set: bool,
     video_reversed: bool,
     foreground_set: bool,
-    intensity_set: bool,
+    intensity: Intensity,
 }
 
 impl Filter {
-    pub fn new(bold: bool) -> Self {
+    pub fn new(bold_colors: bool) -> Self {
         Self {
-            use_bold: bold,
+            bold_colors,
             state: State::Init,
             background_set: false,
             video_reversed: false,
             foreground_set: false,
-            intensity_set: false,
+            intensity: Intensity::Normal,
         }
     }
 
@@ -79,8 +86,15 @@ impl Filter {
         self.background_set != self.video_reversed
     }
 
-    fn bold(&self) -> bool {
-        self.use_bold && (self.intensity_set || self.foreground_set)
+    fn parent_intensity(&self) -> Intensity {
+        if self.intensity == Intensity::Normal
+            && self.bold_colors
+            && self.foreground_set
+        {
+            Intensity::High
+        } else {
+            self.intensity
+        }
     }
 
     fn handle_sgr<F>(&mut self, data: &[u8], mut write: F)
@@ -113,32 +127,35 @@ impl Filter {
 
         let mut any_written = false;
         let mut write_arg = |arg: &[u8]| {
-            if mem::replace(&mut any_written, true) {
-                write(b";");
+            write(if mem::replace(&mut any_written, true) {
+                b";"
             } else {
-                write(b"\x1b[");
-            }
+                b"\x1b["
+            });
             write(arg);
         };
 
         let mut reversed = self.parent_video_reversed();
-        let mut bold = self.bold();
+        let mut intensity = self.parent_intensity();
         while let Some((arg, n)) = iter.next() {
             match n {
                 Some(0) => {
                     self.background_set = false;
                     self.video_reversed = false;
                     self.foreground_set = false;
-                    self.intensity_set = false;
+                    self.intensity = Intensity::Normal;
                     reversed = false;
-                    bold = false;
+                    intensity = Intensity::Normal;
                     write_arg(b"0");
                 }
-                Some(1 | 2) => {
-                    self.intensity_set = true;
+                Some(1) => {
+                    self.intensity = Intensity::High;
+                }
+                Some(2) => {
+                    self.intensity = Intensity::Low;
                 }
                 Some(22) => {
-                    self.intensity_set = false;
+                    self.intensity = Intensity::Normal;
                 }
                 Some(30..=37 | 90..=97) => {
                     self.foreground_set = true;
@@ -185,12 +202,12 @@ impl Filter {
             });
         }
 
-        let new_bold = self.bold();
-        if new_bold != bold {
-            write_arg(if new_bold {
-                b"1"
-            } else {
-                b"22"
+        let new_intensity = self.parent_intensity();
+        if new_intensity != intensity {
+            write_arg(match new_intensity {
+                Intensity::High => b"1",
+                Intensity::Low => b"2",
+                Intensity::Normal => b"22",
             });
         }
 
@@ -333,11 +350,8 @@ where
 fn main() {
     let args = parse_args(env::args_os().skip(1));
     let mut filter = Filter::new(args.bold);
-    match filterm::run(args.command, &mut filter) {
-        Ok(_) => {}
-        Err(e) => {
-            eprintln!("error: {}", e);
-            exit(1);
-        }
+    if let Err(e) = filterm::run(args.command, &mut filter) {
+        eprintln!("error: {}", e);
+        exit(1);
     }
 }
