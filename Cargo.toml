@@ -2,6 +2,12 @@
 name = "monoterm"
 version = "0.1.0"
 edition = "2018"
+description = "Convert terminal colors to monochrome"
+readme = "misc/crate-readme.md"
+repository = "https://github.com/taylordotfish/monoterm"
+license = "GPL-3.0-or-later"
+keywords = ["terminal", "monochrome", "color", "unix", "linux"]
+categories = ["command-line-utilities"]
 
 [dependencies]
-filterm = { path = "../filterm" }
+filterm = "0.1"
