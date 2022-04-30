@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021 taylor.fish <contact@taylor.fish>
+ * Copyright (C) 2021-2022 taylor.fish <contact@taylor.fish>
  *
  * This file is part of Monoterm.
  *
@@ -18,7 +18,6 @@
  */
 
 use filterm::FilterHooks;
-use std::cell::Cell;
 use std::env;
 use std::ffi::OsString;
 use std::mem;
@@ -35,18 +34,24 @@ Options:
   -v --version  Show program version
 ";
 
-thread_local! {
-    static BUFFER: Cell<Option<Vec<u8>>> = Cell::new(None);
+mod buffer {
+    use std::cell::Cell;
+
+    thread_local! {
+        static CACHE: Cell<Option<Vec<u8>>> = Cell::new(None);
+    }
+
+    pub fn make_buffer() -> Vec<u8> {
+        CACHE.with(|buf| buf.take().unwrap_or_default())
+    }
+
+    pub fn destroy_buffer(mut buffer: Vec<u8>) {
+        buffer.clear();
+        CACHE.with(|buf| buf.set(Some(buffer)));
+    }
 }
 
-fn get_buffer() -> Vec<u8> {
-    BUFFER.with(|buf| buf.take().unwrap_or_else(Vec::new))
-}
-
-fn set_buffer(mut buffer: Vec<u8>) {
-    buffer.clear();
-    BUFFER.with(|buf| buf.set(Some(buffer)));
-}
+use buffer::{destroy_buffer, make_buffer};
 
 enum State {
     Init,
@@ -229,7 +234,7 @@ impl Filter {
             },
             State::AfterEsc => match b {
                 b'[' => {
-                    self.state = State::AfterCsi(get_buffer());
+                    self.state = State::AfterCsi(make_buffer());
                 }
                 b => {
                     self.state = State::Init;
@@ -241,7 +246,7 @@ impl Filter {
                     let buf = mem::take(buf);
                     self.state = State::Init;
                     self.handle_sgr(&buf, write);
-                    set_buffer(buf);
+                    destroy_buffer(buf);
                 }
                 b'0'..=b'9' | b';' if buf.len() < 128 => {
                     buf.push(b);
@@ -252,7 +257,7 @@ impl Filter {
                     write(b"\x1b[");
                     write(&buf);
                     write(&[b]);
-                    set_buffer(buf);
+                    destroy_buffer(buf);
                 }
             },
         }
