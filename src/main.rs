@@ -17,7 +17,6 @@
  * along with Monoterm. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use filterm::FilterHooks;
 use std::env;
 use std::ffi::OsString;
 use std::mem;
@@ -264,7 +263,7 @@ impl Filter {
     }
 }
 
-impl FilterHooks for Filter {
+impl filterm::Filter for Filter {
     fn on_child_data<F>(&mut self, data: &[u8], mut parent_write: F)
     where
         F: FnMut(&[u8]),
@@ -304,6 +303,8 @@ where
 {
     let mut bold = false;
     let mut options_done = false;
+
+    // Returns whether `arg` should be part of the executed command.
     let mut process_arg = |arg: &str| match arg {
         _ if options_done => true,
         "--" => {

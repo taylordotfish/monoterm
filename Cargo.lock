@@ -16,9 +16,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "filterm"
-version = "0.2.1"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78640ae5d6e1fcbfce1e40c927d01c769de52b87cf8e876eb271aeec06fdec48"
+checksum = "4c56b60855cc3cf9372f30d2f5efa6e28e95702b3043266abc3e8d40858f57ce"
 dependencies = [
  "nix",
 ]
