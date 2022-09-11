@@ -285,11 +285,11 @@ fn show_version() -> ! {
 }
 
 macro_rules! args_error {
-    ($($args:tt)*) => {
+    ($($args:tt)*) => {{
         eprintln!("error: {}", format_args!($($args)*));
         eprintln!("See monoterm --help for usage information.");
         exit(1);
-    };
+    }};
 }
 
 struct ParsedArgs {
@@ -320,8 +320,10 @@ where
         s if s.starts_with("--") => {
             args_error!("unrecognized option: {}", s);
         }
-        s if s.starts_with('-') => {
-            let iter = s.chars().skip(1).map(|c| match c {
+        s if s.starts_with('-') => s
+            .chars()
+            .skip(1)
+            .map(|c| match c {
                 'h' => show_usage(),
                 'v' => show_version(),
                 'b' => {
@@ -330,9 +332,8 @@ where
                 c => {
                     args_error!("unrecognized option: -{}", c);
                 }
-            });
-            iter.fold(true, |_, _| false)
-        }
+            })
+            .fold(true, |_, _| false),
         _ => {
             options_done = true;
             true
@@ -341,7 +342,10 @@ where
 
     let command: Vec<_> = args
         .into_iter()
-        .filter(|a| process_arg(&a.to_string_lossy()))
+        .filter(|a| match a.to_str() {
+            Some(s) => process_arg(s),
+            None => args_error!("invalid argument: {:?}", a),
+        })
         .collect();
     if command.is_empty() {
         eprint!("{}", USAGE);
