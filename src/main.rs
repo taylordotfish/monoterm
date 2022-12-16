@@ -33,29 +33,10 @@ Options:
   -v --version  Show program version
 ";
 
-mod buffer {
-    use std::cell::Cell;
-
-    thread_local! {
-        static CACHE: Cell<Option<Vec<u8>>> = Cell::new(None);
-    }
-
-    pub fn make_buffer() -> Vec<u8> {
-        CACHE.with(|buf| buf.take().unwrap_or_default())
-    }
-
-    pub fn destroy_buffer(mut buffer: Vec<u8>) {
-        buffer.clear();
-        CACHE.with(|buf| buf.set(Some(buffer)));
-    }
-}
-
-use buffer::{destroy_buffer, make_buffer};
-
 enum State {
     Init,
     AfterEsc,
-    AfterCsi(Vec<u8>),
+    AfterCsi,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -72,6 +53,8 @@ struct Filter {
     video_reversed: bool,
     foreground_set: bool,
     intensity: Intensity,
+    /// Stores escape sequences.
+    buffer: Vec<u8>,
 }
 
 impl Filter {
@@ -83,6 +66,7 @@ impl Filter {
             video_reversed: false,
             foreground_set: false,
             intensity: Intensity::Normal,
+            buffer: Vec::new(),
         }
     }
 
@@ -101,7 +85,7 @@ impl Filter {
         }
     }
 
-    fn handle_sgr<F>(&mut self, data: &[u8], mut write: F)
+    fn handle_sgr<F>(&mut self, mut write: F)
     where
         F: FnMut(&[u8]),
     {
@@ -119,7 +103,7 @@ impl Filter {
             }
         }
 
-        let mut iter = data.split(|b| *b == b';').map(|arg| {
+        let mut iter = self.buffer.split(|b| *b == b';').map(|arg| {
             (
                 arg,
                 match arg {
@@ -233,30 +217,27 @@ impl Filter {
             },
             State::AfterEsc => match b {
                 b'[' => {
-                    self.state = State::AfterCsi(make_buffer());
+                    self.state = State::AfterCsi;
+                    self.buffer.clear();
                 }
                 b => {
                     self.state = State::Init;
                     write(&[0x1b, b]);
                 }
             },
-            State::AfterCsi(buf) => match b {
+            State::AfterCsi => match b {
                 b'm' => {
-                    let buf = mem::take(buf);
                     self.state = State::Init;
-                    self.handle_sgr(&buf, write);
-                    destroy_buffer(buf);
+                    self.handle_sgr(write);
                 }
-                b'0'..=b'9' | b';' if buf.len() < 128 => {
-                    buf.push(b);
+                b'0'..=b'9' | b';' if self.buffer.len() < 128 => {
+                    self.buffer.push(b);
                 }
                 b => {
-                    let buf = mem::take(buf);
                     self.state = State::Init;
                     write(b"\x1b[");
-                    write(&buf);
+                    write(&self.buffer);
                     write(&[b]);
-                    destroy_buffer(buf);
                 }
             },
         }
@@ -275,7 +256,7 @@ impl filterm::Filter for Filter {
 }
 
 fn show_usage() -> ! {
-    print!("{}", USAGE);
+    print!("{USAGE}");
     exit(0);
 }
 
@@ -318,7 +299,7 @@ where
             false
         }
         s if s.starts_with("--") => {
-            args_error!("unrecognized option: {}", s);
+            args_error!("unrecognized option: {s}");
         }
         s if s.starts_with('-') => s
             .chars()
@@ -330,7 +311,7 @@ where
                     bold = true;
                 }
                 c => {
-                    args_error!("unrecognized option: -{}", c);
+                    args_error!("unrecognized option: -{c}");
                 }
             })
             .fold(true, |_, _| false),
@@ -348,7 +329,7 @@ where
         })
         .collect();
     if command.is_empty() {
-        eprint!("{}", USAGE);
+        eprint!("{USAGE}");
         exit(1);
     }
     ParsedArgs {
@@ -361,7 +342,7 @@ fn main() {
     let args = parse_args(env::args_os().skip(1));
     let mut filter = Filter::new(args.bold);
     if let Err(e) = filterm::run(args.command, &mut filter) {
-        eprintln!("error: {}", e);
+        eprintln!("error: {e}");
         exit(1);
     }
 }

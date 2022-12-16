@@ -1,6 +1,6 @@
 [package]
 name = "monoterm"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2018"
 description = "Convert terminal colors to monochrome"
 readme = "misc/crate-readme.md"
@@ -10,4 +10,4 @@ keywords = ["terminal", "monochrome", "color", "unix", "linux"]
 categories = ["command-line-utilities"]
 
 [dependencies]
-filterm = "0.2"
+filterm = "0.3"
