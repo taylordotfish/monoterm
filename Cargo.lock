@@ -16,22 +16,22 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "filterm"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fbdad9616aa004c4751aa6840c5e2d097e20355b789ad4c481a0771aaf61b37"
+checksum = "6778eeb1945089e72f9b2c23fdd67b02e3a844c82b51a2d57f84780c3be8cbe0"
 dependencies = [
  "nix",
 ]
 
 [[package]]
 name = "libc"
-version = "0.2.138"
+version = "0.2.139"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db6d7e329c562c5dfab7a46a2afabc8b987ab9a4834c9d1ca04dc54c1546cef8"
+checksum = "201de327520df007757c1f0adce6e827fe8562fbc28bfd9c15571c66ca1f5f79"
 
 [[package]]
 name = "monoterm"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "filterm",
 ]
