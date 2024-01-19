@@ -4,9 +4,9 @@ version = 3
 
 [[package]]
 name = "atomic-int"
-version = "0.1.0"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80bcac3fc1638d751ce379d62cad36a8c57d2949fa642e5f1d39fc70327296fb"
+checksum = "614cfccf7d180faee0033e1dcb1fecf8023bf2887253bf6f8ce6d148731fa086"
 dependencies = [
  "libc",
 ]
@@ -25,9 +25,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "filterm"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8695177b41dfc50e091dae6fc36de30a106781fdf082d13b5d7c9bff55cea498"
+checksum = "4f0cdf01194ee7855de056f5211739f2002a190df57f67b928dff7e7bbd5f0ba"
 dependencies = [
  "atomic-int",
  "nix",
@@ -35,13 +35,13 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.148"
+version = "0.2.152"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9cdc71e17332e86d2e1d38c1f99edcb6288ee11b815fb1a4b049eaa2114d369b"
+checksum = "13e3bf6590cbc649f4d1a3eefc9d5d6eb746f5200ffb04e5e142700b8faa56e7"
 
 [[package]]
 name = "monoterm"
-version = "0.1.7"
+version = "0.1.8-dev"
 dependencies = [
  "filterm",
 ]

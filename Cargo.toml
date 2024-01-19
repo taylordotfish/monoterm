@@ -1,6 +1,6 @@
 [package]
 name = "monoterm"
-version = "0.1.7"
+version = "0.1.8-dev"
 edition = "2018"
 rust-version = "1.63"
 description = "Convert terminal colors to monochrome"
