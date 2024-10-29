@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021-2022 taylor.fish <contact@taylor.fish>
+ * Copyright (C) 2021-2022, 2024 taylor.fish <contact@taylor.fish>
  *
  * This file is part of Monoterm.
  *
@@ -18,7 +18,7 @@
  */
 
 use std::env;
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::mem;
 use std::process::exit;
 
@@ -28,9 +28,9 @@ Usage: monoterm [options] <command> [args...]
 Executes <command> while converting all terminal colors to monochrome.
 
 Options:
-  -b --bold     Convert foreground colors to bold text
-  -h --help     Show this help message
-  -v --version  Show program version
+  -b, --bold     Convert foreground colors to bold text
+  -h, --help     Show this help message
+  -v, --version  Show program version
 ";
 
 enum State {
@@ -104,13 +104,10 @@ impl Filter {
         }
 
         let mut iter = self.buffer.split(|b| *b == b';').map(|arg| {
-            (
-                arg,
-                match arg {
-                    [] => Some(0),
-                    _ => std::str::from_utf8(arg).unwrap().parse::<u8>().ok(),
-                },
-            )
+            (arg, match arg {
+                [] => Some(0),
+                _ => std::str::from_utf8(arg).unwrap().parse::<u8>().ok(),
+            })
         });
 
         let mut any_written = false;
@@ -286,48 +283,46 @@ where
     let mut options_done = false;
 
     // Returns whether `arg` should be part of the executed command.
-    let mut process_arg = |arg: &str| match arg {
-        _ if options_done => true,
-        "--" => {
+    let mut process_arg = |arg: &OsStr| {
+        let bytes = arg.as_encoded_bytes();
+        if options_done || arg == "-" {
+        } else if arg == "--" {
             options_done = true;
-            false
-        }
-        "--help" => show_usage(),
-        "--version" => show_version(),
-        "--bold" => {
+            return false;
+        } else if arg == "--help" {
+            show_usage();
+        } else if arg == "--version" {
+            show_version();
+        } else if arg == "--bold" {
             bold = true;
-            false
-        }
-        s if s.starts_with("--") => {
-            args_error!("unrecognized option: {s}");
-        }
-        s if s.starts_with('-') => s
-            .chars()
-            .skip(1)
-            .map(|c| match c {
-                'h' => show_usage(),
-                'v' => show_version(),
-                'b' => {
+            return false;
+        } else if bytes.starts_with(b"--") {
+            args_error!("unrecognized option: {}", arg.to_string_lossy());
+        } else if let Some(opts) = bytes.strip_prefix(b"-") {
+            opts.iter().copied().for_each(|opt| match opt {
+                b'h' => show_usage(),
+                b'v' => show_version(),
+                b'b' => {
                     bold = true;
                 }
-                c => {
-                    args_error!("unrecognized option: -{c}");
+                _ if opt.is_ascii() => {
+                    args_error!("unrecognized option: -{}", char::from(opt));
                 }
-            })
-            .fold(true, |_, _| false),
-        _ => {
-            options_done = true;
-            true
+                _ => {
+                    args_error!(
+                        "unrecognized option: {}",
+                        arg.to_string_lossy(),
+                    );
+                }
+            });
+            return false;
         }
+        options_done = true;
+        true
     };
 
-    let command: Vec<_> = args
-        .into_iter()
-        .filter(|a| match a.to_str() {
-            Some(s) => process_arg(s),
-            None => args_error!("invalid argument: {a:?}"),
-        })
-        .collect();
+    let command: Vec<_> =
+        args.into_iter().filter(|a| process_arg(a)).collect();
     if command.is_empty() {
         eprint!("{USAGE}");
         exit(1);
