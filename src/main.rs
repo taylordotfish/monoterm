@@ -33,7 +33,12 @@ Options:
   -v, --version  Show program version
 ";
 
-enum State {
+/// Maximum length of a single SGR sequence, excluding the initial CSI and
+/// the ending 'm'. Sequences longer than this length will be forwarded to the
+/// parent terminal unmodified.
+const SGR_MAX_LEN: usize = 128;
+
+enum SgrState {
     Init,
     AfterEsc,
     AfterCsi,
@@ -48,12 +53,12 @@ enum Intensity {
 
 struct Filter {
     bold_colors: bool,
-    state: State,
+    state: SgrState,
     background_set: bool,
     video_reversed: bool,
     foreground_set: bool,
     intensity: Intensity,
-    /// Stores escape sequences.
+    /// Stores the contents of possible in-progress SGR escape sequences.
     buffer: Vec<u8>,
 }
 
@@ -61,7 +66,7 @@ impl Filter {
     pub fn new(bold_colors: bool) -> Self {
         Self {
             bold_colors,
-            state: State::Init,
+            state: SgrState::Init,
             background_set: false,
             video_reversed: false,
             foreground_set: false,
@@ -106,7 +111,7 @@ impl Filter {
         let mut iter = self.buffer.split(|b| *b == b';').map(|arg| {
             (arg, match arg {
                 [] => Some(0),
-                _ => std::str::from_utf8(arg).unwrap().parse::<u8>().ok(),
+                _ => (|| std::str::from_utf8(arg).ok()?.parse().ok())(),
             })
         });
 
@@ -205,33 +210,33 @@ impl Filter {
     where
         F: FnMut(&[u8]),
     {
-        match &mut self.state {
-            State::Init => match b {
+        match &self.state {
+            SgrState::Init => match b {
                 0x1b => {
-                    self.state = State::AfterEsc;
+                    self.state = SgrState::AfterEsc;
                 }
                 b => write(&[b]),
             },
-            State::AfterEsc => match b {
+            SgrState::AfterEsc => match b {
                 b'[' => {
-                    self.state = State::AfterCsi;
+                    self.state = SgrState::AfterCsi;
                     self.buffer.clear();
                 }
                 b => {
-                    self.state = State::Init;
+                    self.state = SgrState::Init;
                     write(&[0x1b, b]);
                 }
             },
-            State::AfterCsi => match b {
+            SgrState::AfterCsi => match b {
                 b'm' => {
-                    self.state = State::Init;
+                    self.state = SgrState::Init;
                     self.handle_sgr(write);
                 }
-                b'0'..=b'9' | b';' if self.buffer.len() < 128 => {
+                b'0'..=b'9' | b';' if self.buffer.len() < SGR_MAX_LEN => {
                     self.buffer.push(b);
                 }
                 b => {
-                    self.state = State::Init;
+                    self.state = SgrState::Init;
                     write(b"\x1b[");
                     write(&self.buffer);
                     write(&[b]);
