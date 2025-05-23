@@ -270,7 +270,7 @@ fn show_version() -> ! {
 macro_rules! args_error {
     ($($args:tt)*) => {{
         eprintln!("error: {}", format_args!($($args)*));
-        eprintln!("See monoterm --help for usage information.");
+        eprintln!("See `monoterm --help` for usage information.");
         exit(1);
     }};
 }
