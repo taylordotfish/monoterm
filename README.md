@@ -30,7 +30,7 @@ The basic usage is `monoterm <command> [args...]`. Generally you would use this
 to invoke your shell; e.g., `monoterm bash`.
 
 With the `--bold` option, text that was originally colored will be rendered as
-**bold**. See `monoterm --help` for more information and additional options.
+**bold**. See `monoterm --help` for more information.
 
 License
 -------
