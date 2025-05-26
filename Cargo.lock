@@ -31,9 +31,9 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "filterm"
-version = "0.5.1"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a205f5e7f30d4990758e5ef5535511130d23bd07a8987bcc81e90dcdd0d3ec45"
+checksum = "554be2e7edc99ce970bbe044098e70e9eda5ed2667385c371eb5fc5cfada8be6"
 dependencies = [
  "atomic-int",
  "nix",
@@ -47,7 +47,7 @@ checksum = "d750af042f7ef4f724306de029d18836c26c1765a54a6a3f094cbd23a7267ffa"
 
 [[package]]
 name = "monoterm"
-version = "0.1.10-dev"
+version = "0.1.10"
 dependencies = [
  "filterm",
 ]
