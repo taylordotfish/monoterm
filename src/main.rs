@@ -90,7 +90,7 @@ impl Filter {
         }
     }
 
-    fn handle_sgr<F>(&mut self, mut write: F)
+    fn handle_sgr<F>(&mut self, write: &mut F)
     where
         F: FnMut(&[u8]),
     {
@@ -206,7 +206,7 @@ impl Filter {
         }
     }
 
-    fn handle_byte<F>(&mut self, b: u8, mut write: F)
+    fn handle_byte<F>(&mut self, b: u8, write: &mut F)
     where
         F: FnMut(&[u8]),
     {

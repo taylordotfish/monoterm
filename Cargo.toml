@@ -1,6 +1,6 @@
 [package]
 name = "monoterm"
-version = "0.1.10"
+version = "0.1.11"
 edition = "2021"
 rust-version = "1.74"
 description = "Convert terminal colors to monochrome"
@@ -11,4 +11,4 @@ keywords = ["terminal", "monochrome", "color", "unix", "linux"]
 categories = ["command-line-utilities"]
 
 [dependencies]
-filterm = "0.5.2"
+filterm = "0.5.3"
